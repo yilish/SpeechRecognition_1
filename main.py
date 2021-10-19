@@ -11,7 +11,7 @@ def read_wav(path: str) -> [np.ndarray, int]:
     :param path: The path of wave file to be read.
     :return: signal - the intensity of wave, sample rate - the rate of sampling
     """
-    sample_rate, signal = scipy.io.wavfile.read('Jiading.wav')
+    sample_rate, signal = scipy.io.wavfile.read(path)
     return signal, sample_rate
 
 
@@ -134,19 +134,21 @@ if __name__ == '__main__':
     sig, sample_rate = read_wav('Jiading.wav')
 
     plt.figure(figsize=(7.5, 15), dpi=200)
+
     plt.subplot(5, 1, 1)
     plt.plot(sig)
     plt.title('Raw Signal')
     plt.xlabel('Frame')
     plt.ylabel('Power')
-
+    # Pre-emphasis
     pre_emphasized_signal = pre_emphasis(sig)
     plt.subplot(5, 1, 2)
     plt.plot(pre_emphasized_signal)
     plt.title('Pre Emphasized Signal')
     plt.xlabel('Frame')
     plt.ylabel('Power')
-    # plt.show()
+
+    # Windowing
     frame = framing(sig, sample_rate)
     windowed = window(frame, frame.shape[1])
     plt.subplot(5, 1, 3)
@@ -154,34 +156,38 @@ if __name__ == '__main__':
     plt.xlabel('Frame')
     plt.ylabel('Window')
     plt.title('Windowed Features')
-    # FFT
+
+    # STFT
     NFFT = 512
     mag_frames = np.absolute(np.fft.rfft(windowed, NFFT))  # Magnitude of the FFT
     pow_frames = ((1.0 / NFFT) * ((mag_frames) ** 2))  # Power Spectrum
 
+    # Mel-filter Bank
     fbanks = mel_filter_bank(low_freq=0, high_freq=int(sample_rate / 2), nfilter=20, nfft=NFFT, sample_rate=sample_rate)
     filter_banks = np.dot(pow_frames, fbanks.T)
     filter_banks = np.where(filter_banks == 0, np.finfo(float).eps, filter_banks)
-    # log part
+
+    # Log()
     filter_banks = np.log10(filter_banks)
     plt.subplot(5, 1, 4)
-
     plt.imshow(filter_banks[4:, :].T)
     plt.xlabel('Frame')
     plt.ylabel('Window')
     plt.title('Filtered Features')
-    # plt.show()
-    # go thru dct, here we're using the top 12 dims as the feature, where F0 info is removed
+
+    # DCT
     num_ceps = 12
     mfccs = dct(filter_banks, type=2, axis=1, norm='ortho')[:, 1:(num_ceps + 1)]
-    dynamic_feature = dynamic_featurization(mfccs, windowed)
-    features = feature_transform(dynamic_feature)
-    plt.subplot(5, 1, 5)
 
+    # Dynamic feature extraction
+    dynamic_feature = dynamic_featurization(mfccs, windowed)
+    # Feature transformation
+    features = feature_transform(dynamic_feature)
+
+    plt.subplot(5, 1, 5)
     plt.imshow(features[4:, :].T)
     plt.xlabel('Frame')
     plt.ylabel('Window')
     plt.title('Features')
     plt.subplots_adjust(hspace=0.4)
-
     plt.show()
